@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dash_dockview"
+version = "0.1.2"
+description = "Dash component for the dockview layout manager: tabbed, resizable, dockable panels"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Kirill Shaplyko", email = "k.shaplyko@gmail.com" }]
+requires-python = ">=3.8"
+dependencies = ["dash>=2.0.0"]
+keywords = ["dash", "plotly", "dockview", "layout", "panels", "tabs"]
+classifiers = [
+    "Framework :: Dash",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: JavaScript",
+    "Topic :: Software Development :: User Interfaces",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["dash_dockview*"]
+
+[tool.setuptools.package-data]
+dash_dockview = ["*.js", "*.json", "*.map", "*.txt"]

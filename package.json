@@ -1,0 +1,44 @@
+{
+  "name": "dash_dockview",
+  "version": "0.1.2",
+  "description": "Dash component for the dockview layout manager",
+  "main": "index.ts",
+  "scripts": {
+    "build:js::dev": "webpack --mode development",
+    "build:js": "webpack",
+    "build:backends": "dash-generate-components ./src/ts/components dash_dockview -p package-info.json --ignore \"\\.test\\.|PanelContent|PanelTab|TabMenu|glyphs\"",
+    "build": "npm run build:js && npm run build:backends",
+    "watch": "npm run build:js::dev -- --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format": "prettier --write src --ignore-path=.prettierignore"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "css-loader": "^6.10.0",
+    "jsdom": "^25.0.0",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.2.4",
+    "react": "18.2.0",
+    "react-docgen": "^5.4.3",
+    "react-dom": "18.2.0",
+    "style-loader": "^3.3.4",
+    "ts-loader": "^9.3.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0",
+    "webpack": "^5.101.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "peerDependencies": {
+    "react": "16 - 19",
+    "react-dom": "16 - 19"
+  },
+  "author": "Kirill Shaplyko <k.shaplyko@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "dockview": "8.6.1",
+    "dockview-react": "8.6.1"
+  }
+}

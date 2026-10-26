@@ -1,0 +1,22 @@
+{
+  "grid": {
+    "root": {
+      "type": "branch",
+      "data": [
+        { "type": "leaf", "data": { "views": ["p1", "p2"], "activeView": "p1", "id": "g1" }, "size": 700 },
+        { "type": "leaf", "data": { "views": ["p3", "p4"], "activeView": "p3", "id": "g2" }, "size": 700 }
+      ],
+      "size": 570
+    },
+    "width": 1400,
+    "height": 570,
+    "orientation": "HORIZONTAL"
+  },
+  "panels": {
+    "p1": { "id": "p1", "contentComponent": "default", "title": "Line chart" },
+    "p2": { "id": "p2", "contentComponent": "default", "title": "Table" },
+    "p3": { "id": "p3", "contentComponent": "default", "title": "Table" },
+    "p4": { "id": "p4", "contentComponent": "default", "title": "Box plot" }
+  },
+  "activeGroup": "g1"
+}

@@ -1,0 +1,5 @@
+include dash_dockview/dash_dockview.js
+include dash_dockview/metadata.json
+include dash_dockview/package-info.json
+include dash_dockview/dash_dockview.js.LICENSE.txt
+include dash_dockview/proptypes.js

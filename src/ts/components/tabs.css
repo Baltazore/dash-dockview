@@ -1,0 +1,173 @@
+/*
+ * Styles for the tab and the badge menu.
+ * Class names start with ddv- so they cannot collide with the dv- classes of
+ * dockview. The bar height and colors come from the --dv- theme variables.
+ */
+
+.ddv-tab,
+.ddv-menu {
+  --ddv-blue: #1b5edb;
+  --ddv-dashed: #8a8a8a;
+  --ddv-text: #1f1f1f;
+  --ddv-text-muted: #4d4d4d;
+  --ddv-menu-border: #d6d6d6;
+  --ddv-menu-hover: #f3f3f3;
+}
+
+/* Dockview pads .dv-tab on its own. The tab sets the 16 px here instead. */
+.dv-tab:has(> .dv-react-part > .ddv-tab) {
+  padding: 0 16px;
+}
+
+.ddv-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  font-size: 14px;
+  white-space: nowrap;
+  color: var(--ddv-text-muted);
+}
+
+.ddv-tab--active {
+  color: var(--ddv-text);
+}
+
+.ddv-tab-icon {
+  flex: none;
+  display: block;
+}
+
+.ddv-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 3px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ddv-badge:disabled {
+  cursor: default;
+}
+
+.ddv-badge--ungrouped {
+  border: 1.5px dashed var(--ddv-dashed);
+  background: transparent;
+}
+
+.ddv-badge--group {
+  border: none;
+  background: var(--ddv-blue);
+  color: #fff;
+}
+
+.ddv-tab-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ddv-tab-close:hover {
+  background-color: var(--dv-icon-hover-background-color);
+}
+
+/* The menu lives in document.body, so it cannot read the --dv- variables. */
+.ddv-menu {
+  position: fixed;
+  top: var(--ddv-menu-top, 0);
+  left: var(--ddv-menu-left, 0);
+  z-index: 2000;
+  box-sizing: border-box;
+  min-width: 200px;
+  padding: 4px 0;
+  border: 1px solid var(--ddv-menu-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.ddv-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ddv-text);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ddv-menu-item:hover,
+.ddv-menu-item:focus-visible {
+  background-color: var(--ddv-menu-hover);
+}
+
+.ddv-menu-glyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.ddv-menu-glyph--group {
+  border-radius: 3px;
+  background: var(--ddv-blue);
+}
+
+/*
+ * Group focus marks. Dockview sets dv-active-group on the focused group and
+ * dv-inactive-group on the others. The app sets these four --dv- tokens with
+ * themeOverrides. Without them the marks draw nothing.
+ *
+ * The content border sits below the tab bar, so the tab bar keeps its full
+ * width. Set the same width on both borders, so the content does not move
+ * when the focus changes.
+ */
+.dv-groupview.dv-active-group > .dv-content-container {
+  box-sizing: border-box;
+  border: var(--dv-activegroup-content-border, none);
+}
+
+.dv-groupview.dv-inactive-group > .dv-content-container {
+  box-sizing: border-box;
+  border: var(--dv-inactivegroup-content-border, none);
+}
+
+/* The underline is an inset shadow, so it does not change the tab height. */
+.dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab {
+  box-shadow: inset 0 -2px 0 0 var(--dv-activegroup-visiblepanel-tab-underline-color, transparent);
+}
+
+.dv-groupview.dv-inactive-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab {
+  box-shadow: inset 0 -2px 0 0 var(--dv-inactivegroup-visiblepanel-tab-underline-color, transparent);
+}
