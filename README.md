@@ -55,7 +55,7 @@ if __name__ == "__main__":
 Dockview owns the DOM of a panel, and Dash owns the DOM of its components. The component joins the two with an id convention.
 
 1. For each panel, render a `html.Div` with the id `__dv_content_{dockviewId}_{panelId}` anywhere in the Dash layout. Start it with `display: none`.
-2. When dockview mounts the panel, the component moves that div into the panel and shows it.
+2. When dockview mounts the panel, the component moves that div into the panel and shows it. If the div is not in the page yet, or has no children yet, the component waits until Dash renders it.
 3. When the panel closes, dockview disposes the panel DOM with the content div inside it. Remove the div from the Dash layout as well, and render a new one when you add the panel again.
 
 Dockview mounts only the visible panel of a group. A panel in a background tab adopts its content when it becomes active.
@@ -68,7 +68,7 @@ Dockview mounts only the visible panel of a group. A panel in a background tab a
 | --- | --- | --- | --- |
 | `id` | `str` | `"dockview"` | The component id. It is also the prefix of the content div ids. |
 | `panels` | `list[PanelDef]` | `[]` | The panels. See [PanelDef](#paneldef). |
-| `layout` | `dict \| None` | `None` | A layout from dockview's `toJSON()`. A new value restores it with `fromJSON()`. |
+| `layout` | `dict \| None` | `None` | A layout from dockview's `toJSON()`. A new value restores it with `fromJSON()`. See [Notes](#notes). |
 | `initialLayout` | `dict \| None` | `None` | A layout to load on the first mount only. |
 | `layoutDebounceMs` | `int` | `250` | The delay before the component reports a layout change. |
 | `width` | `str \| int` | `"100%"` | The width of the container. A number is pixels. |
@@ -81,8 +81,8 @@ Dockview mounts only the visible panel of a group. A panel in a background tab a
 
 | Prop | Type | Description |
 | --- | --- | --- |
-| `lastPanelAdded` | `dict` | `{panelId, title, groupId}` when a panel is added. |
-| `lastPanelRemoved` | `dict` | `{panelId}` when a panel is removed. |
+| `lastPanelAdded` | `dict` | `{panelId, title, groupId}` when a panel is added. A layout restore does not set it. |
+| `lastPanelRemoved` | `dict` | `{panelId}` when a panel is removed. A layout restore does not set it. |
 | `activePanel` | `dict` | `{panelId, groupId}` when the active panel changes. Both are `None` when no panel is active. |
 | `openPanels` | `list[str]` | The ids of the open panels. Updated on each layout change, debounced. |
 | `layout` | `dict` | The layout from `toJSON()`. Updated on each layout change, debounced. The component removes the tab fields from it before it reports it. |
@@ -222,8 +222,11 @@ node harness/drive.mjs boot --out shots --measure
 | `badge-drag` | Drags from the badge and from the title. Only the drag from the title moves the tab. |
 | `active-close` | Applies a two-group layout. Checks that the tabs keep their icon and badge, and that the close button shows on the active tab of each group only. |
 | `badge-update` | Clicks `flip-badge`. `--measure` prints the time from the click callback to the new badge. |
+| `late-content` | Sets a layout with a new panel `p5`. Dash renders the `p5` content div and lists `p5` in `panels` 1500 ms later. Checks that the panel adopts it. |
 | `narrow` | Sets the viewport to 560 px wide and checks the overflow control. |
 | `dump` | Prints the tab bar DOM and the last events. |
+
+Run the harness with Dash 3.2. With Dash 4.4 the renderer re-creates the content divs when the children of their container change, and the `late-content` scenario fails on that.
 
 Each scenario saves a PNG to the `--out` folder and prints the `harness-events` entries that it reads.
 If the pinned Chromium is not downloaded, set `PW_CHROMIUM_PATH` to another Chromium executable.
@@ -236,7 +239,7 @@ Set `HARNESS_PLAIN=1` when you start `harness/app.py` to leave out `icon`, `badg
 - Dockview `api.isActive` is true only for the active panel of the active group. The tab reads `api.isVisible` instead, which is true for the active panel of each group.
 - The badge stops `pointerdown` and `click`, and cancels `mousedown`. Without the first, a click on the badge of an inactive tab switches the tab. Without the last, a drag that starts on the badge moves the tab.
 - The component renders the badge menu into `document.body`, because the tab bar clips its children.
-- A layout restore with `fromJSON()` disposes the panels and their content divs. Render the content divs again after a restore, or the panels stay empty.
+- A layout restore keeps each panel that the new layout still has, with its content div. It disposes each panel that the new layout drops, with its content div. Dash gets the result in `openPanels`, not in `lastPanelAdded` or `lastPanelRemoved`.
 
 ## License
 

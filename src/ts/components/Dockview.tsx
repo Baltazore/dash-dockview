@@ -257,7 +257,9 @@ const Dockview = (props: Props) => {
     }
     restoring.current = true;
     try {
-      api.fromJSON(serialized as Parameters<DockviewApi["fromJSON"]>[0]);
+      api.fromJSON(serialized as Parameters<DockviewApi["fromJSON"]>[0], {
+        reuseExistingPanels: true,
+      });
       trackedIds.current = new Set(api.panels.map((panel) => panel.id));
       // The restored panels carry the params of the saved layout, not the
       // current ones.
@@ -274,7 +276,12 @@ const Dockview = (props: Props) => {
     const api = event.api;
     apiRef.current = api;
 
+    // A restore is one operation. Dash learns its result from openPanels, so
+    // the panels that fromJSON adds or disposes are not reported one by one.
     api.onDidAddPanel((panel) => {
+      if (restoring.current) {
+        return;
+      }
       const added: PanelAddedEvent = {
         panelId: panel.id,
         title: panel.title || panel.id,
@@ -284,6 +291,9 @@ const Dockview = (props: Props) => {
       scheduleRef.current();
     });
     api.onDidRemovePanel((panel) => {
+      if (restoring.current) {
+        return;
+      }
       const removed: PanelRemovedEvent = { panelId: panel.id };
       latest.current.setProps({ lastPanelRemoved: removed });
       scheduleRef.current();
@@ -302,7 +312,9 @@ const Dockview = (props: Props) => {
     if (first && !mounted.current) {
       restoring.current = true;
       try {
-        api.fromJSON(first as Parameters<DockviewApi["fromJSON"]>[0]);
+        api.fromJSON(first as Parameters<DockviewApi["fromJSON"]>[0], {
+          reuseExistingPanels: true,
+        });
         api.panels.forEach((panel) => trackedIds.current.add(panel.id));
         syncTabParams(api, initialPanels);
       } finally {

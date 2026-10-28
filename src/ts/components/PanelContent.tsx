@@ -3,9 +3,6 @@ import type { IDockviewPanelProps } from "dockview-react";
 
 export const DockviewIdContext = createContext("");
 
-// Dash may render the content div after the panel mounts, so adoption retries.
-const ADOPT_RETRY_DELAYS_MS = [50, 200, 500];
-
 export const contentElementId = (dockviewId: string, panelId: string) =>
   `__dv_content_${dockviewId}_${panelId}`;
 
@@ -17,9 +14,6 @@ const PanelContent = ({ api }: IDockviewPanelProps) => {
     if (!api.id || !dockviewId) {
       return undefined;
     }
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const clearTimers = () => timers.forEach(clearTimeout);
-
     const adopt = () => {
       const content = document.getElementById(
         contentElementId(dockviewId, api.id),
@@ -30,16 +24,21 @@ const PanelContent = ({ api }: IDockviewPanelProps) => {
       }
       content.style.display = "block";
       host.current.appendChild(content);
-      clearTimers();
       return true;
     };
 
-    if (!adopt()) {
-      ADOPT_RETRY_DELAYS_MS.forEach((delay) =>
-        timers.push(setTimeout(adopt, delay)),
-      );
+    if (adopt()) {
+      return undefined;
     }
-    return clearTimers;
+    // Dash can render the content div at any time after the panel mounts,
+    // for example after a layout restore that adds the panel.
+    const observer = new MutationObserver(() => {
+      if (adopt()) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [api.id, dockviewId]);
 
   return (
