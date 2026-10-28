@@ -13,7 +13,7 @@ It is built on `dockview-react` 8.6.1 (MIT). It works with Dash 2 and Dash 3.
 Build the wheel (see [Build](#build)) and install it:
 
 ```bash
-pip install dist/dash_dockview-0.1.2-py3-none-any.whl
+pip install dist/dash_dockview-0.1.3-py3-none-any.whl
 ```
 
 ## Quick start
