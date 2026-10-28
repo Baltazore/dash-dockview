@@ -84,10 +84,26 @@ const fake = vi.hoisted(() => {
     );
     getGroup = vi.fn(() => undefined);
     toJSON = vi.fn(() => ({ panels: this.panels.map((panel) => panel.id) }));
-    fromJSON = vi.fn((layout: { panels: string[] }) => {
-      this.panels = [];
-      layout.panels.forEach((id) => this.insert(id));
-    });
+    // Dockview disposes every live panel, unless reuseExistingPanels keeps
+    // the ones that the new layout still has. A kept panel takes the params
+    // of the layout, and this layout has none.
+    fromJSON = vi.fn(
+      (
+        layout: { panels: string[] },
+        options?: { reuseExistingPanels: boolean },
+      ) => {
+        const kept = options?.reuseExistingPanels ? layout.panels : [];
+        this.panels
+          .filter((panel) => !kept.includes(panel.id))
+          .forEach((panel) => this.removePanel(panel.id));
+        this.panels.forEach((panel) => {
+          panel.params = undefined;
+        });
+        layout.panels
+          .filter((id) => !this.panels.some((panel) => panel.id === id))
+          .forEach((id) => this.insert(id));
+      },
+    );
   }
 
   return {
@@ -319,6 +335,66 @@ describe("layout round trip", () => {
     expect(
       setProps.mock.calls.filter(([update]) => "layout" in update),
     ).toHaveLength(1);
+  });
+
+  it("reports a restore that drops one panel and keeps another as openPanels only", () => {
+    const setProps = vi.fn();
+    const { rerender } = render(
+      <Dockview
+        panels={NO_PANELS}
+        layout={{ panels: ["x", "y"] }}
+        setProps={setProps}
+      />,
+    );
+    flushDebounce();
+    setProps.mockClear();
+
+    rerender(
+      <Dockview
+        panels={NO_PANELS}
+        layout={{ panels: ["y", "z"] }}
+        setProps={setProps}
+      />,
+    );
+    flushDebounce();
+
+    expect(setProps.mock.calls).toEqual([[{ openPanels: ["y", "z"] }]]);
+
+    act(() => api().removePanel("y"));
+
+    expect(setProps).toHaveBeenCalledWith({
+      lastPanelRemoved: { panelId: "y" },
+    });
+  });
+
+  it("asks dockview to reuse the live panels when it restores a layout", () => {
+    render(
+      <Dockview
+        panels={NO_PANELS}
+        layout={{ panels: ["x", "y"] }}
+        setProps={vi.fn()}
+      />,
+    );
+
+    expect(api().fromJSON).toHaveBeenCalledWith(
+      { panels: ["x", "y"] },
+      { reuseExistingPanels: true },
+    );
+  });
+
+  it("asks dockview to reuse the live panels when it loads initialLayout", () => {
+    render(
+      <Dockview
+        panels={MN}
+        initialLayout={{ panels: ["m", "n"] }}
+        setProps={vi.fn()}
+      />,
+    );
+
+    expect(api().fromJSON).toHaveBeenCalledWith(
+      { panels: ["m", "n"] },
+      { reuseExistingPanels: true },
+    );
   });
 
   it("debounces several changes into one report", () => {
@@ -576,16 +652,30 @@ describe("panel content adoption", () => {
     expect(content.style.display).toBe("block");
   });
 
-  it("retries until the content has children", () => {
+  it("waits until the content div has children", async () => {
     const content = makeContent(false);
     const { container } = mountPanel(content);
     expect(container.contains(content)).toBe(false);
 
-    content.appendChild(document.createElement("span"));
-    act(() => {
-      vi.advanceTimersByTime(200);
+    await act(async () => {
+      content.appendChild(document.createElement("span"));
     });
 
     expect(container.contains(content)).toBe(true);
+  });
+
+  it("adopts a content div that Dash renders 2 seconds after the panel mounted", async () => {
+    const { container } = mountPanel(null);
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    const content = makeContent(true);
+
+    await act(async () => {
+      document.body.appendChild(content);
+    });
+
+    expect(container.contains(content)).toBe(true);
+    expect(content.style.display).toBe("block");
   });
 });

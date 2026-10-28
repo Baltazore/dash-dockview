@@ -22,6 +22,7 @@ const SCENARIOS = [
   "badge-drag",
   "active-close",
   "badge-update",
+  "late-content",
   "narrow",
   "dump",
 ];
@@ -218,6 +219,10 @@ const scenarios = {
 
   async "set-layout"(page, { out }) {
     await sleep(600);
+    // A reference to each content node shows whether the restore kept the node or let Dash render a new one.
+    await page.evaluate((panelIds) => {
+      window.__contentBefore = Object.fromEntries(panelIds.map((panelId) => [panelId, document.getElementById(`__dv_content_dv_${panelId}`)]));
+    }, PANEL_IDS);
     await page.click("#set-layout");
     await sleep(1500);
     const events = await readEvents(page);
@@ -230,7 +235,20 @@ const scenarios = {
     // The first layout entry is Dash reporting the value Python set. Any later one is an echo.
     const layoutEntries = after.filter((event) => event.prop === "layout");
     check("no layout echo after the Python-set value", layoutEntries.length === 1);
+    check("no lastPanelRemoved after set-layout", !after.some((event) => event.prop === "lastPanelRemoved"));
+    check("no lastPanelAdded after set-layout", !after.some((event) => event.prop === "lastPanelAdded"));
     await shot(page, out, "layout");
+    // Dockview detaches the content of a background tab, so each tab is activated before its content is read.
+    for (const panelId of PANEL_IDS) {
+      await tabOf(page, panelId).locator(".ddv-tab-title").click();
+      await sleep(150);
+      const content = await page.evaluate((id) => {
+        const node = document.getElementById(`__dv_content_dv_${id}`);
+        return { inDockview: !!node?.closest(".dv-dockview"), sameNode: !!node && node === window.__contentBefore[id] };
+      }, panelId);
+      console.log(`${panelId} content ${JSON.stringify(content)}`);
+      check(`${panelId} content div is the same node and is inside .dv-dockview`, content.inDockview && content.sameNode);
+    }
   },
 
   async "remove-panel"(page, { out }) {
@@ -560,6 +578,27 @@ const scenarios = {
     await sleep(600);
     check("a panels update keeps an open menu and its node", (await page.locator('.ddv-menu[data-probe="kept"]').count()) === 1);
     await shot(page, out, "badge-update-menu");
+  },
+
+  async "late-content"(page, { out }) {
+    await sleep(600);
+    const before = (await readEvents(page)).length;
+    await page.click("#late-content");
+    await page.waitForSelector('.dv-tab[data-tab-panel-id="p5"]', { timeout: 5000 });
+    const lateContent = () =>
+      page.evaluate(() => {
+        const node = document.getElementById("__dv_content_dv_p5");
+        return { exists: !!node, inDockview: !!node?.closest(".dv-dockview") };
+      });
+    const early = await lateContent();
+    console.log(`p5 content when its tab shows ${JSON.stringify(early)}`);
+    check("the p5 tab shows before Dash renders its content div", !early.exists);
+    await sleep(2500);
+    const late = await lateContent();
+    console.log(`p5 content after 2500 ms ${JSON.stringify(late)}`);
+    printEvents("events after late-content", (await eventsSince(page, before)).map((event) => (event.prop === "layout" ? { ...event, value: "<layout>" } : event)));
+    check("the late p5 content div is inside .dv-dockview", late.inDockview);
+    await shot(page, out, "late-content");
   },
 
   async narrow(page, { out }) {

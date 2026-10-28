@@ -54,6 +54,30 @@ FLIPPED_PANELS = [{**PANELS[0], "badge": FLIPPED_BADGE}, *PANELS[1:]]
 
 TWO_GROUP_LAYOUT = json.loads((Path(__file__).parent / "two_group_layout.json").read_text())
 
+LATE_PANEL_ID = "p5"
+LATE_CONTENT_DELAY_MS = 1500
+
+
+def late_panel_layout() -> dict:
+    """The two-group layout with p5 as the active tab of the second group, so that dockview mounts it."""
+    layout = json.loads(json.dumps(TWO_GROUP_LAYOUT))
+    group = layout["grid"]["root"]["data"][1]["data"]
+    group["views"].append(LATE_PANEL_ID)
+    group["activeView"] = LATE_PANEL_ID
+    layout["panels"][LATE_PANEL_ID] = {"id": LATE_PANEL_ID, "contentComponent": "default", "title": "Late"}
+    return layout
+
+
+def content_div(panel_id: str, title: str) -> html.Div:
+    return html.Div(
+        id=f"__dv_content_{DOCKVIEW_ID}_{panel_id}",
+        style={"display": "none"},
+        children=[
+            html.H3(f"Content of {title}"),
+            html.P(f"This is the adopted content for {panel_id}."),
+        ],
+    )
+
 OUTPUT_PROPS = [
     "activePanel",
     "lastPanelAdded",
@@ -119,6 +143,10 @@ function(ticks, dockviewId, panelIds) {
 """
 
 
+def boot_content_divs() -> list[html.Div]:
+    return [content_div(panel_id, title) for panel_id, title in PANEL_TITLES.items()]
+
+
 FLIP_BADGE_JS = """
 function(clicks, flippedPanels) {
     window.performance.mark('flip-badge-clicked');
@@ -160,6 +188,7 @@ def build_app() -> Dash:
                     html.Button("remove-panel", id="remove-panel"),
                     html.Button("apply-theme", id="apply-theme"),
                     html.Button("flip-badge", id="flip-badge"),
+                    html.Button("late-content", id="late-content"),
                     html.Span(id="adopt-status", style={"marginLeft": "12px"}),
                     html.Span(id="badge-status", style={"marginLeft": "12px"}),
                 ],
@@ -174,23 +203,14 @@ def build_app() -> Dash:
             ),
             html.Div(
                 id="dockview-content-container",
-                children=[
-                    html.Div(
-                        id=f"__dv_content_{DOCKVIEW_ID}_{panel_id}",
-                        style={"display": "none"},
-                        children=[
-                            html.H3(f"Content of {title}"),
-                            html.P(f"This is the adopted content for {panel_id}."),
-                        ],
-                    )
-                    for panel_id, title in PANEL_TITLES.items()
-                ],
+                children=boot_content_divs(),
             ),
             dcc.Store(id="harness-events", data=[]),
             dcc.Store(id="harness-panel-ids", data=list(PANEL_TITLES)),
             dcc.Store(id="harness-dockview-id", data=DOCKVIEW_ID),
             dcc.Store(id="harness-flipped-panels", data=FLIPPED_PANELS),
             dcc.Interval(id="adopt-tick", interval=25, max_intervals=40),
+            dcc.Interval(id="late-content-tick", interval=LATE_CONTENT_DELAY_MS, max_intervals=1, disabled=True),
         ]
     )
 
@@ -238,6 +258,28 @@ def build_app() -> Dash:
     )
     def set_layout(_clicks):
         return TWO_GROUP_LAYOUT
+
+    # The layout adds p5 before Dash renders its content div. The interval renders the div later.
+    @app.callback(
+        Output(DOCKVIEW_ID, "layout", allow_duplicate=True),
+        Output("late-content-tick", "disabled"),
+        Input("late-content", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def set_late_panel_layout(_clicks):
+        return late_panel_layout(), False
+
+    # The app lists the panel in `panels` in the same update, as the Dash app does
+    # after a restore. A panel that `panels` does not list closes on the next render.
+    @app.callback(
+        Output("dockview-content-container", "children"),
+        Output(DOCKVIEW_ID, "panels", allow_duplicate=True),
+        Input("late-content-tick", "n_intervals"),
+        State("dockview-content-container", "children"),
+        prevent_initial_call=True,
+    )
+    def render_late_content(_ticks, children):
+        return [*children, content_div(LATE_PANEL_ID, "Late")], [*PANELS, {"id": LATE_PANEL_ID, "title": "Late"}]
 
     @app.callback(
         Output(DOCKVIEW_ID, "panels"),
