@@ -17,7 +17,7 @@ import "./tabs.css";
 import PanelContent, { DockviewIdContext } from "./PanelContent";
 import PanelTab from "./PanelTab";
 import { EmitTabOutput, TabOutputContext } from "./tabOutput";
-import { stripPanelParams, tabParamsOf } from "./tabParams";
+import { layoutKey, stripPanelParams, tabParamsOf } from "./tabParams";
 import { buildThemeCss } from "./themeCss";
 import {
   ActivePanelEvent,
@@ -190,8 +190,9 @@ const Dockview = (props: Props) => {
   const trackedIds = useRef<Set<string>>(new Set());
   const mounted = useRef(false);
   const restoring = useRef(false);
-  // JSON of the last layout that Dash holds, set by a report or by a restore.
-  // A change event that matches it carries nothing new, so it is not echoed.
+  // layoutKey of the last layout that Dash holds, set by a report or by a
+  // restore. A change event that matches it carries nothing new, so it is not
+  // echoed. A resize changes only the grid size, which the key ignores.
   const lastLayoutJson = useRef<string | null>(null);
   const lastOpenPanelsJson = useRef<string | null>(null);
   const reportTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -210,7 +211,7 @@ const Dockview = (props: Props) => {
       return;
     }
     const serialized = serializeLayout(api);
-    const layoutJson = JSON.stringify(serialized);
+    const layoutJson = layoutKey(serialized);
     const openPanels = api.panels.map((panel) => panel.id);
     const openPanelsJson = JSON.stringify(openPanels);
 
@@ -264,7 +265,7 @@ const Dockview = (props: Props) => {
       // The restored panels carry the params of the saved layout, not the
       // current ones.
       syncTabParams(api, latest.current.panels);
-      lastLayoutJson.current = JSON.stringify(serializeLayout(api));
+      lastLayoutJson.current = layoutKey(serializeLayout(api));
     } finally {
       restoring.current = false;
     }
@@ -357,7 +358,7 @@ const Dockview = (props: Props) => {
     if (!api || !layout || !ready || restoring.current) {
       return;
     }
-    if (JSON.stringify(serializeLayout(api)) !== JSON.stringify(layout)) {
+    if (layoutKey(serializeLayout(api)) !== layoutKey(layout)) {
       restoreLayout(layout);
     }
   }, [layout, ready, restoreLayout]);

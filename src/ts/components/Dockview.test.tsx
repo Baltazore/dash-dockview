@@ -419,6 +419,89 @@ describe("layout round trip", () => {
     expect(setProps).toHaveBeenCalledTimes(1);
   });
 
+  describe("a size-only layout change", () => {
+    const withGrid = (root: string, width: number, height: number) =>
+      ({
+        panels: ["x"],
+        grid: { root, width, height, orientation: "HORIZONTAL" },
+      }) as never;
+    const layoutReports = (setProps: Mock) =>
+      setProps.mock.calls.filter(([update]) => "layout" in update);
+
+    it("is not reported to Dash", () => {
+      const setProps = vi.fn();
+      render(<Dockview panels={NO_PANELS} setProps={setProps} />);
+      api().toJSON.mockImplementation(() => withGrid("r1", 800, 600));
+      act(() => api().emit("layout"));
+      flushDebounce();
+      setProps.mockClear();
+
+      api().toJSON.mockImplementation(() => withGrid("r1", 1000, 700));
+      act(() => api().emit("layout"));
+      flushDebounce();
+
+      expect(layoutReports(setProps)).toEqual([]);
+    });
+
+    it("does not hide a structural change, and the report keeps the grid size", () => {
+      const setProps = vi.fn();
+      render(<Dockview panels={NO_PANELS} setProps={setProps} />);
+      api().toJSON.mockImplementation(() => withGrid("r1", 800, 600));
+      act(() => api().emit("layout"));
+      flushDebounce();
+      setProps.mockClear();
+
+      api().toJSON.mockImplementation(() => withGrid("r2", 1000, 700));
+      act(() => api().emit("layout"));
+      flushDebounce();
+
+      expect(layoutReports(setProps)).toEqual([
+        [{ layout: withGrid("r2", 1000, 700) }],
+      ]);
+    });
+
+    it("is not reported after a restore", () => {
+      const setProps = vi.fn();
+      const { rerender } = render(
+        <Dockview panels={NO_PANELS} setProps={setProps} />,
+      );
+      api().toJSON.mockImplementation(() => withGrid("r1", 800, 600));
+      rerender(
+        <Dockview
+          panels={NO_PANELS}
+          layout={withGrid("r2", 800, 600)}
+          setProps={setProps}
+        />,
+      );
+      expect(api().fromJSON).toHaveBeenCalledTimes(1);
+      flushDebounce();
+      setProps.mockClear();
+
+      api().toJSON.mockImplementation(() => withGrid("r1", 1000, 700));
+      act(() => api().emit("layout"));
+      flushDebounce();
+
+      expect(layoutReports(setProps)).toEqual([]);
+    });
+
+    it("does not restore a layout from the prop that differs only in size", () => {
+      const { rerender } = render(
+        <Dockview panels={NO_PANELS} setProps={vi.fn()} />,
+      );
+      api().toJSON.mockImplementation(() => withGrid("r1", 1000, 700));
+
+      rerender(
+        <Dockview
+          panels={NO_PANELS}
+          layout={withGrid("r1", 800, 600)}
+          setProps={vi.fn()}
+        />,
+      );
+
+      expect(api().fromJSON).not.toHaveBeenCalled();
+    });
+  });
+
   it("loads initialLayout once and ignores later changes to it", () => {
     const { rerender } = render(
       <Dockview

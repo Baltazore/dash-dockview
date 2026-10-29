@@ -20,3 +20,19 @@ export function stripPanelParams<T extends { panels?: unknown }>(layout: T): T {
   }
   return layout;
 }
+
+// Dockview writes the container size in pixels into grid.width and
+// grid.height. A resize alone must not look like a new layout, so the
+// comparison key leaves both out. The layout that Dash stores keeps them,
+// because fromJSON uses them as the initial root size.
+export function layoutKey(serialized: object): string {
+  const { grid } = serialized as { grid?: unknown };
+  if (!grid || typeof grid !== "object") {
+    return JSON.stringify(serialized);
+  }
+  const { width: _width, height: _height, ...structure } = grid as {
+    width?: unknown;
+    height?: unknown;
+  };
+  return JSON.stringify({ ...serialized, grid: structure });
+}
