@@ -271,7 +271,16 @@ const Dockview = (props: Props) => {
       // The restored panels carry the params of the saved layout, not the
       // current ones.
       syncTabParams(api, latest.current.panels);
-      lastLayoutJson.current = layoutJsonOf(serializeLayout(api));
+      const live = serializeLayout(api);
+      lastLayoutJson.current = layoutJsonOf(live);
+      // A saved pixel layout becomes fractions in Dash, so the host stores the
+      // fraction form when the user opens an old workspace.
+      if (
+        JSON.stringify(serialized) !==
+        JSON.stringify(normalizeLayout(serialized))
+      ) {
+        latest.current.setProps({ layout: live });
+      }
     } finally {
       restoring.current = false;
     }

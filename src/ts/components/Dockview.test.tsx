@@ -587,6 +587,59 @@ describe("layout round trip", () => {
       expect(api().fromJSON).not.toHaveBeenCalled();
     });
 
+    describe("a restored pixel layout", () => {
+      // The fake dockview shows the restored layout from toJSON after fromJSON.
+      const renderRestore = (layout: never) => {
+        const setProps = vi.fn();
+        const view = (prop?: never) => (
+          <Dockview panels={NO_PANELS} layout={prop} setProps={setProps} />
+        );
+        const { rerender } = render(view());
+        flushDebounce();
+        api().toJSON.mockImplementation(() => withGrid("r1", 1000, 700));
+        const restoredFrom = api().fromJSON.getMockImplementation()!;
+        api().fromJSON.mockImplementation((...args) => {
+          restoredFrom(...args);
+          api().toJSON.mockImplementation(() => layout);
+        });
+        setProps.mockClear();
+        act(() => rerender(view(layout)));
+        return { setProps, rerender: (prop: never) => rerender(view(prop)) };
+      };
+
+      it("is reported once to Dash as fractions in a 1x1 box", () => {
+        const { setProps } = renderRestore(withGrid("r2", 1200, 800));
+
+        expect(layoutReports(setProps)).toEqual([
+          [{ layout: fractionsOf("r2", [0.5, 0.5]) }],
+        ]);
+        flushDebounce();
+
+        expect(layoutReports(setProps)).toHaveLength(1);
+      });
+
+      it("is not reported when the prop already holds fractions", () => {
+        const { setProps } = renderRestore(
+          fractionsOf("r2", [0.5, 0.5]) as never,
+        );
+        flushDebounce();
+
+        expect(api().fromJSON).toHaveBeenCalledTimes(1);
+        expect(layoutReports(setProps)).toEqual([]);
+      });
+
+      it("is not restored again when Dash hands the fractions back", () => {
+        const { setProps, rerender } = renderRestore(withGrid("r2", 1200, 800));
+        const reported = layoutReports(setProps)[0][0].layout;
+
+        rerender(reported as never);
+        flushDebounce();
+
+        expect(api().fromJSON).toHaveBeenCalledTimes(1);
+        expect(layoutReports(setProps)).toHaveLength(1);
+      });
+    });
+
     it("restores a prop layout with another split ratio, as it came", () => {
       const { rerender } = render(
         <Dockview panels={NO_PANELS} setProps={vi.fn()} />,
