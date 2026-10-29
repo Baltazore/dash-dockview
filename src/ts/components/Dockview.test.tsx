@@ -420,43 +420,110 @@ describe("layout round trip", () => {
   });
 
   describe("a size-only layout change", () => {
-    const withGrid = (root: string, width: number, height: number) =>
-      ({
+    // A grid with two leaves, as dockview serializes it: pixel sizes along the
+    // split, the container size in grid.width and grid.height. The node ids
+    // stand for the structure.
+    const withGrid = (
+      structure: string,
+      width: number,
+      height: number,
+      [first, second]: [number, number] = [0.5, 0.5],
+    ) => {
+      const leaf = (id: string, share: number) => ({
+        type: "leaf",
+        data: { views: [id], activeView: id, id },
+        size: share * width,
+      });
+      return {
         panels: ["x"],
-        grid: { root, width, height, orientation: "HORIZONTAL" },
-      }) as never;
+        grid: {
+          root: {
+            type: "branch",
+            size: height,
+            data: [
+              leaf(`${structure}-a`, first),
+              leaf(`${structure}-b`, second),
+            ],
+          },
+          width,
+          height,
+          orientation: "HORIZONTAL",
+        },
+      } as never;
+    };
     const layoutReports = (setProps: Mock) =>
       setProps.mock.calls.filter(([update]) => "layout" in update);
+    const fractionsOf = (structure: string, [first, second]: number[]) => ({
+      panels: ["x"],
+      grid: {
+        root: {
+          type: "branch",
+          size: 1,
+          data: [first, second].map((share, index) => {
+            const id = `${structure}-${index === 0 ? "a" : "b"}`;
+            return {
+              type: "leaf",
+              data: { views: [id], activeView: id, id },
+              size: share,
+            };
+          }),
+        },
+        width: 1,
+        height: 1,
+        orientation: "HORIZONTAL",
+      },
+    });
 
-    it("is not reported to Dash", () => {
+    it("is not reported to Dash when every size scales with the container", () => {
       const setProps = vi.fn();
       render(<Dockview panels={NO_PANELS} setProps={setProps} />);
-      api().toJSON.mockImplementation(() => withGrid("r1", 800, 600));
+      api().toJSON.mockImplementation(() => withGrid("r1", 1200, 800));
       act(() => api().emit("layout"));
       flushDebounce();
       setProps.mockClear();
 
-      api().toJSON.mockImplementation(() => withGrid("r1", 1000, 700));
+      api().toJSON.mockImplementation(() => withGrid("r1", 800, 600));
       act(() => api().emit("layout"));
       flushDebounce();
 
       expect(layoutReports(setProps)).toEqual([]);
     });
 
-    it("does not hide a structural change, and the report keeps the grid size", () => {
+    it("does not hide a structural change, and the report holds fractions in a 1x1 box", () => {
       const setProps = vi.fn();
       render(<Dockview panels={NO_PANELS} setProps={setProps} />);
-      api().toJSON.mockImplementation(() => withGrid("r1", 800, 600));
+      api().toJSON.mockImplementation(() => withGrid("r1", 1200, 800));
       act(() => api().emit("layout"));
       flushDebounce();
       setProps.mockClear();
 
-      api().toJSON.mockImplementation(() => withGrid("r2", 1000, 700));
+      api().toJSON.mockImplementation(() =>
+        withGrid("r2", 1000, 700, [0.75, 0.25]),
+      );
       act(() => api().emit("layout"));
       flushDebounce();
 
       expect(layoutReports(setProps)).toEqual([
-        [{ layout: withGrid("r2", 1000, 700) }],
+        [{ layout: fractionsOf("r2", [0.75, 0.25]) }],
+      ]);
+    });
+
+    it("reports a change of the split ratio", () => {
+      const setProps = vi.fn();
+      render(<Dockview panels={NO_PANELS} setProps={setProps} />);
+      api().toJSON.mockImplementation(() => withGrid("r1", 1200, 800));
+      act(() => api().emit("layout"));
+      flushDebounce();
+      setProps.mockClear();
+
+      api().toJSON.mockImplementation(() =>
+        withGrid("r1", 1200, 800, [0.25, 0.75]),
+      );
+      act(() => api().emit("layout"));
+      flushDebounce();
+
+      expect(layoutReports(setProps)).toEqual([
+        [{ layout: fractionsOf("r1", [0.25, 0.75]) }],
       ]);
     });
 
@@ -465,11 +532,11 @@ describe("layout round trip", () => {
       const { rerender } = render(
         <Dockview panels={NO_PANELS} setProps={setProps} />,
       );
-      api().toJSON.mockImplementation(() => withGrid("r1", 800, 600));
+      api().toJSON.mockImplementation(() => withGrid("r1", 1200, 800));
       rerender(
         <Dockview
           panels={NO_PANELS}
-          layout={withGrid("r2", 800, 600)}
+          layout={withGrid("r2", 1200, 800)}
           setProps={setProps}
         />,
       );
@@ -477,14 +544,14 @@ describe("layout round trip", () => {
       flushDebounce();
       setProps.mockClear();
 
-      api().toJSON.mockImplementation(() => withGrid("r1", 1000, 700));
+      api().toJSON.mockImplementation(() => withGrid("r1", 800, 600));
       act(() => api().emit("layout"));
       flushDebounce();
 
       expect(layoutReports(setProps)).toEqual([]);
     });
 
-    it("does not restore a layout from the prop that differs only in size", () => {
+    it("does not restore a prop layout in fractions that matches the live layout", () => {
       const { rerender } = render(
         <Dockview panels={NO_PANELS} setProps={vi.fn()} />,
       );
@@ -493,12 +560,46 @@ describe("layout round trip", () => {
       rerender(
         <Dockview
           panels={NO_PANELS}
-          layout={withGrid("r1", 800, 600)}
+          layout={fractionsOf("r1", [0.5, 0.5])}
           setProps={vi.fn()}
         />,
       );
 
       expect(api().fromJSON).not.toHaveBeenCalled();
+    });
+
+    it("does not restore a prop layout in pixels from another viewport", () => {
+      const { rerender } = render(
+        <Dockview panels={NO_PANELS} setProps={vi.fn()} />,
+      );
+      api().toJSON.mockImplementation(() =>
+        withGrid("r1", 1000, 700, [0.75, 0.25]),
+      );
+
+      rerender(
+        <Dockview
+          panels={NO_PANELS}
+          layout={withGrid("r1", 800, 600, [0.75, 0.25])}
+          setProps={vi.fn()}
+        />,
+      );
+
+      expect(api().fromJSON).not.toHaveBeenCalled();
+    });
+
+    it("restores a prop layout with another split ratio, as it came", () => {
+      const { rerender } = render(
+        <Dockview panels={NO_PANELS} setProps={vi.fn()} />,
+      );
+      api().toJSON.mockImplementation(() => withGrid("r1", 1000, 700));
+      const saved = withGrid("r1", 800, 600, [0.75, 0.25]);
+
+      rerender(
+        <Dockview panels={NO_PANELS} layout={saved} setProps={vi.fn()} />,
+      );
+
+      expect(api().fromJSON).toHaveBeenCalledTimes(1);
+      expect(api().fromJSON.mock.calls[0][0]).toBe(saved);
     });
   });
 
@@ -592,7 +693,9 @@ describe("tab fields", () => {
     );
     const panel = api().getPanel("a")!;
 
-    rerender(<Dockview panels={[{ id: "a", title: "A" }]} setProps={vi.fn()} />);
+    rerender(
+      <Dockview panels={[{ id: "a", title: "A" }]} setProps={vi.fn()} />,
+    );
 
     // Dockview drops a param whose new value is undefined.
     expect(panel.api.updateParameters.mock.calls[0][0]).toStrictEqual({

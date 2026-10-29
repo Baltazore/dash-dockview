@@ -17,7 +17,7 @@ import "./tabs.css";
 import PanelContent, { DockviewIdContext } from "./PanelContent";
 import PanelTab from "./PanelTab";
 import { EmitTabOutput, TabOutputContext } from "./tabOutput";
-import { layoutKey, stripPanelParams, tabParamsOf } from "./tabParams";
+import { normalizeLayout, stripPanelParams, tabParamsOf } from "./tabParams";
 import { buildThemeCss } from "./themeCss";
 import {
   ActivePanelEvent,
@@ -41,7 +41,9 @@ type Props = {
   panels?: PanelDef[];
 
   /**
-   * Serialized layout state from Dockview's toJSON().
+   * Serialized layout state from Dockview's toJSON(). Sizes are fractions of
+   * the parent, so the layout does not depend on the viewport. A layout with
+   * pixel sizes also loads, and only the ratios between siblings count.
    */
   layout?: SerializedLayout;
 
@@ -150,7 +152,11 @@ function toAddPanelOptions(api: DockviewApi, def: PanelDef): AddPanelOptions {
   return options;
 }
 
-const serializeLayout = (api: DockviewApi) => stripPanelParams(api.toJSON());
+const serializeLayout = (api: DockviewApi) =>
+  normalizeLayout(stripPanelParams(api.toJSON()));
+
+const layoutJsonOf = (layout: SerializedLayout) =>
+  JSON.stringify(normalizeLayout(layout));
 
 // A panel that is missing from the API was closed by the user. Skip it.
 // An update repaints the tab, so a panel whose params already match gets none.
@@ -190,9 +196,9 @@ const Dockview = (props: Props) => {
   const trackedIds = useRef<Set<string>>(new Set());
   const mounted = useRef(false);
   const restoring = useRef(false);
-  // layoutKey of the last layout that Dash holds, set by a report or by a
-  // restore. A change event that matches it carries nothing new, so it is not
-  // echoed. A resize changes only the grid size, which the key ignores.
+  // JSON of the last layout that Dash holds, set by a report or by a restore.
+  // A change event that matches it carries nothing new, so it is not echoed.
+  // Sizes are fractions of the parent, so a resize does not change it.
   const lastLayoutJson = useRef<string | null>(null);
   const lastOpenPanelsJson = useRef<string | null>(null);
   const reportTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -211,7 +217,7 @@ const Dockview = (props: Props) => {
       return;
     }
     const serialized = serializeLayout(api);
-    const layoutJson = layoutKey(serialized);
+    const layoutJson = layoutJsonOf(serialized);
     const openPanels = api.panels.map((panel) => panel.id);
     const openPanelsJson = JSON.stringify(openPanels);
 
@@ -265,7 +271,7 @@ const Dockview = (props: Props) => {
       // The restored panels carry the params of the saved layout, not the
       // current ones.
       syncTabParams(api, latest.current.panels);
-      lastLayoutJson.current = layoutKey(serializeLayout(api));
+      lastLayoutJson.current = layoutJsonOf(serializeLayout(api));
     } finally {
       restoring.current = false;
     }
@@ -358,7 +364,7 @@ const Dockview = (props: Props) => {
     if (!api || !layout || !ready || restoring.current) {
       return;
     }
-    if (layoutKey(serializeLayout(api)) !== layoutKey(layout)) {
+    if (layoutJsonOf(serializeLayout(api)) !== layoutJsonOf(layout)) {
       restoreLayout(layout);
     }
   }, [layout, ready, restoreLayout]);
